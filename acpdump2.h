@@ -23,6 +23,9 @@
 #include <stdint.h>
 #include <time.h>
 #include "ip2.h"
+#ifndef _WIN32
+#include <sys/time.h>
+#endif
 
 #if defined ACPDUMP_LOCK && _WIN32
     #include <windows.h>

@@ -129,7 +129,9 @@ void std_err(void);
 const int portAmongUs = 22023;
 const int portAmongUsBroadcast = 47777;
 char destinationHostAux[100];
-int running = 1, runningBroadcast = 1, stoppingProxyShown = 0;
+int running = 1;
+volatile int runningBroadcast = 1;
+volatile int stoppingProxyShown = 0;
 
 void INThandler2(int sig){
     runningBroadcast = 0;
