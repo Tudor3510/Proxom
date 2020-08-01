@@ -41,7 +41,6 @@
     #define in_addr_t       uint32_t
 
     #define set_priority    SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS)
-    HINSTANCE   hLib    = NULL;
 
     void winerr(void);
 #else
@@ -54,7 +53,6 @@
     #include <sys/time.h>
 
     #define set_priority    nice(-10)
-    void        *hLib   = NULL;
     #define SOCKET          int
     #define SOCKET_ERROR    (-1)
 #endif
