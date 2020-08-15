@@ -124,17 +124,26 @@ void show_peer_array(u8 *str, struct sockaddr_in *peer);
 in_addr_t resolv(char *host);
 void std_err(void);
 
-const int portAmongUs = 22023;
-const int portAmongUsBroadcast = 47777;
+const int PORT_AMONG_US = 22023;
+const int PORT_AMONG_US_BROADCAST = 47777;
+
 char destinationHostAux[100];
 int running = 1;
 volatile int runningBroadcast = 1;
 volatile int stoppingProxyShown = 0;
 
+int firstTimeBroadcast = 1;
+sfUdpSocket *broadcastSocket;
+char broadcastMessage[100];
+char finalBroadcastMessage[100];
+
+const char AUX_MESSAGE[] = "Server";
+const char AUX_MESSAGE_FINAL[] = "~Open~1~";
+
 void INThandler2(int sig){
     runningBroadcast = 0;
     running = 0;
-    Sleep(1100);
+    Sleep(600);
     if(!stoppingProxyShown){
         printf("- stopping the proxy...\n");
         stoppingProxyShown = 1;
@@ -149,20 +158,33 @@ void  INThandler(int sig){
     runningBroadcast = 0;
 }
 
-
-
-void *broadcastAmongUs(){
-    sfUdpSocket *broadcastSocket;
+void initializeBroadcasting(){
     broadcastSocket = sfUdpSocket_create();
     sfUdpSocket_setBlocking(broadcastSocket, sfFalse);
 
-    char broadcastMessage[] = "..Server~Open~1~";
-    broadcastMessage[0] = 4;
-    broadcastMessage[1] = 2;
+    finalBroadcastMessage[0] = 4;
+    finalBroadcastMessage[1] = 2;
+
+    if (strlen(broadcastMessage) > 0)
+        strcpy(finalBroadcastMessage + strlen(finalBroadcastMessage), broadcastMessage);
+    else 
+        strcpy(finalBroadcastMessage + strlen(finalBroadcastMessage), AUX_MESSAGE);
+
+    strcpy(finalBroadcastMessage + strlen(finalBroadcastMessage) , AUX_MESSAGE_FINAL);
+
+}
+
+void *broadcastGame(){
+    if (firstTimeBroadcast) firstTimeBroadcast = 0;
+    else printf("- starting the broadcasting of the server on port %d\n", PORT_AMONG_US_BROADCAST);
+
+    runningBroadcast = 1;
 
     while (runningBroadcast){
-        sfUdpSocket_send(broadcastSocket, broadcastMessage, strlen(broadcastMessage), sfIpAddress_Broadcast, portAmongUsBroadcast);
-        Sleep(1000);
+        sfUdpSocket_send(broadcastSocket, finalBroadcastMessage, strlen(finalBroadcastMessage), sfIpAddress_Broadcast, PORT_AMONG_US_BROADCAST);
+        Sleep(500);
+        if (!runningBroadcast) break;
+        Sleep(500);
     }
 
     printf("- stopping the broadcasting of the server...\n");
@@ -223,17 +245,32 @@ int main(int argc, char *argv[]) {
         "\n", stderr);
 
 
-    if(argc < 2) {
+    int ipAddressCompleted = 0;
+
+    if (argc > 2){
+        for (int index_arg = 1; index_arg < argc; index_arg++){
+            if (strcmp(argv[index_arg], "-s") == 0){
+                strcpy(destinationHostAux, argv[index_arg + 1]);
+                ipAddressCompleted = 1;
+            }
+
+            if (strcmp(argv[index_arg], "-m") == 0){
+                strcpy(broadcastMessage, argv[index_arg + 1]);
+            }
+
+        //   printf(argv[index_arg]);
+         //  printf("\n");
+        }
+    }
+
+    if(!ipAddressCompleted) {
         printf("\n"
             "Enter the server ip address:\n");
         scanf("%s", destinationHostAux);
-    }else{
-        strcpy(destinationHostAux, argv[argc-1]);
     }
 
-
-    port  = portAmongUs;
-    lport = portAmongUs;
+    port  = PORT_AMONG_US;
+    lport = PORT_AMONG_US;
     dhost = create_peer_array(destinationHostAux, port);
 
     if(lhost == INADDR_NONE) std_err();
@@ -282,8 +319,9 @@ int main(int argc, char *argv[]) {
 
     if(priority) set_priority;
 
-    printf("- starting the broadcasting of the server on port %d\n", portAmongUsBroadcast);
-    pthread_create(&broadcastThread, NULL, broadcastAmongUs, NULL);
+    printf("- starting the broadcasting of the server on port %d\n", PORT_AMONG_US_BROADCAST);
+    initializeBroadcasting();
+    pthread_create(&broadcastThread, NULL, broadcastGame, NULL);
 
 
     if(!dhost[0].sin_addr.s_addr) {
