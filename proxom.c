@@ -248,7 +248,7 @@ int main(int argc, char *argv[]) {
     int ipAddressCompleted = 0;
 
     if (argc > 2){
-        for (int index_arg = 1; index_arg < argc; index_arg++){
+        for (int index_arg = 1; index_arg < argc - 1; index_arg++){
             if (strcmp(argv[index_arg], "-s") == 0){
                 strcpy(destinationHostAux, argv[index_arg + 1]);
                 ipAddressCompleted = 1;
