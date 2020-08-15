@@ -257,9 +257,6 @@ int main(int argc, char *argv[]) {
             if (strcmp(argv[index_arg], "-m") == 0){
                 strcpy(broadcastMessage, argv[index_arg + 1]);
             }
-
-        //   printf(argv[index_arg]);
-         //  printf("\n");
         }
     }
 
@@ -317,7 +314,7 @@ int main(int argc, char *argv[]) {
         if(t != 'a') create_acp(fdcap);
     }
 
-    if(priority) set_priority;
+    //set_priority;
 
     printf("- starting the broadcasting of the server on port %d\n", PORT_AMONG_US_BROADCAST);
     initializeBroadcasting();
