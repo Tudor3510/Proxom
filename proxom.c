@@ -140,22 +140,26 @@ char finalBroadcastMessage[100];
 const char AUX_MESSAGE[] = "Server";
 const char AUX_MESSAGE_FINAL[] = "~Open~1~";
 
-void INThandler2(int sig){
+DWORD messageThreadId = 0;
+HANDLE broadcastGameHandle, messageThreadHandle;
+
+void INThandler(int sig){
     runningBroadcast = 0;
     running = 0;
-    Sleep(600);
+    PostThreadMessage(messageThreadId, WM_CLOSE, 0, 0);
+
+
+    WaitForSingleObject(broadcastGameHandle, INFINITE);
+    WaitForSingleObject(messageThreadHandle, INFINITE);
+
+    Sleep(300);
+
     if(!stoppingProxyShown){
         printf("- stopping the proxy...\n");
         stoppingProxyShown = 1;
     }
-    exit(0);
-}
 
-void  INThandler(int sig){
-#ifdef _WIN32
-    signal(SIGINT, INThandler2);
-#endif
-    runningBroadcast = 0;
+    exit(0);
 }
 
 void initializeBroadcasting(){
@@ -174,7 +178,7 @@ void initializeBroadcasting(){
 
 }
 
-void *broadcastGame(){
+DWORD WINAPI broadcastGame(LPVOID lpParam){
     if (firstTimeBroadcast) firstTimeBroadcast = 0;
     else printf("- starting the broadcasting of the server on port %d\n", PORT_AMONG_US_BROADCAST);
 
@@ -189,17 +193,63 @@ void *broadcastGame(){
 
     printf("- stopping the broadcasting of the server...\n");
 
+    return 0;
+
+}
+
+DWORD WINAPI messageThread(LPVOID lpParam){
+    enum{
+        START_BROADCASTING = 137,
+        STOP_BROADCASTING = 197
+    };
+
+    RegisterHotKey(0, START_BROADCASTING, MOD_SHIFT, 0x48);
+    RegisterHotKey(0, STOP_BROADCASTING, MOD_SHIFT, 0x4A);
+
+    
+
+    MSG msg;
+    DWORD threadResult;
+    while(GetMessage(&msg, 0, 0, 0)){
+        PeekMessage(&msg, 0, 0, 0, PM_REMOVE);
+
+        if (msg.message == WM_HOTKEY){
+            switch (msg.wParam){
+
+                case START_BROADCASTING:
+
+                    if (!runningBroadcast){
+                        threadResult = WaitForSingleObject(broadcastGameHandle, INFINITE);
+
+                        if (threadResult == WAIT_OBJECT_0)
+                            broadcastGameHandle = CreateThread(0, 0, broadcastGame, NULL, 0, 0);
+                    }
+                    break;
+
+                case STOP_BROADCASTING:
+                    runningBroadcast = 0;
+                    break;
+            }
+        }
+
+        if (msg.message == WM_CLOSE) break;
+    }
+
+    UnregisterHotKey(0, START_BROADCASTING);
+    UnregisterHotKey(0, STOP_BROADCASTING);
+
+
+    return 0;
 }
 
 int main(int argc, char *argv[]) {
 #ifdef _WIN32
     signal(SIGINT, INThandler);
+    signal(SIGBREAK, INThandler);
 #else
     signal(SIGQUIT, INThandler);
     signal(SIGINT, INThandler2);
 #endif
-
-    pthread_t broadcastThread;
 
     struct clients_struct   *c  = NULL,
                             *tmpc;
@@ -318,8 +368,8 @@ int main(int argc, char *argv[]) {
 
     printf("- starting the broadcasting of the server on port %d\n", PORT_AMONG_US_BROADCAST);
     initializeBroadcasting();
-    pthread_create(&broadcastThread, NULL, broadcastGame, NULL);
-
+    broadcastGameHandle = CreateThread (0, 0, broadcastGame, NULL, 0, 0);
+    messageThreadHandle = CreateThread (0, 0, messageThread, NULL, 0, &messageThreadId);
 
     if(!dhost[0].sin_addr.s_addr) {
         sd0 = bind_udp_socket(&peer0, Lhost, port);
@@ -481,8 +531,8 @@ int main(int argc, char *argv[]) {
             show_dump(buff, len, stdout);
         }
     }
-
-    pthread_join(broadcastThread, NULL);
+    WaitForSingleObject(broadcastGameHandle, INFINITE);
+    WaitForSingleObject(messageThreadHandle, INFINITE);
 
     if(!stoppingProxyShown){
         printf("- stopping the proxy...\n");
