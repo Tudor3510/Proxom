@@ -129,8 +129,9 @@ const int PORT_AMONG_US_BROADCAST = 47777;
 
 char destinationHostAux[100];
 int running = 1;
-volatile int runningBroadcast = 1;
+volatile int runningBroadcast = 0;
 volatile int stoppingProxyShown = 0;
+volatile int shouldInitialize = 1;
 
 int firstTimeBroadcast = 1;
 sfUdpSocket *broadcastSocket;
@@ -143,8 +144,17 @@ const char AUX_MESSAGE_FINAL[] = "~Open~1~";
 DWORD messageThreadId = 0;
 HANDLE broadcastGameHandle, messageThreadHandle;
 
+const int BROADCAST_THREAD_WAITING_TIME = 2000;
+const int PROXY_WAITING_TIME = 400;
+const int HALF_BROADCAST_TIME = 500;
+
 void INThandler(int sig){
-    runningBroadcast = 0;
+    if (runningBroadcast){
+        runningBroadcast = 0;
+        printf("- stopping the broadcasting of the server...\n");
+    }
+
+    shouldInitialize = 0;
     running = 0;
     PostThreadMessage(messageThreadId, WM_CLOSE, 0, 0);
 
@@ -152,7 +162,7 @@ void INThandler(int sig){
     WaitForSingleObject(broadcastGameHandle, INFINITE);
     WaitForSingleObject(messageThreadHandle, INFINITE);
 
-    Sleep(300);
+    Sleep(PROXY_WAITING_TIME);
 
     if(!stoppingProxyShown){
         printf("- stopping the proxy...\n");
@@ -176,22 +186,17 @@ void initializeBroadcasting(){
 
     strcpy(finalBroadcastMessage + strlen(finalBroadcastMessage) , AUX_MESSAGE_FINAL);
 
+    runningBroadcast = 1;
 }
 
 DWORD WINAPI broadcastGame(LPVOID lpParam){
-    if (firstTimeBroadcast) firstTimeBroadcast = 0;
-    else printf("- starting the broadcasting of the server on port %d\n", PORT_AMONG_US_BROADCAST);
-
-    runningBroadcast = 1;
 
     while (runningBroadcast){
         sfUdpSocket_send(broadcastSocket, finalBroadcastMessage, strlen(finalBroadcastMessage), sfIpAddress_Broadcast, PORT_AMONG_US_BROADCAST);
-        Sleep(500);
+        Sleep(HALF_BROADCAST_TIME);
         if (!runningBroadcast) break;
-        Sleep(500);
+        Sleep(HALF_BROADCAST_TIME);
     }
-
-    printf("- stopping the broadcasting of the server...\n");
 
     return 0;
 
@@ -219,15 +224,21 @@ DWORD WINAPI messageThread(LPVOID lpParam){
                 case START_BROADCASTING:
 
                     if (!runningBroadcast){
-                        threadResult = WaitForSingleObject(broadcastGameHandle, INFINITE);
+                        threadResult = WaitForSingleObject(broadcastGameHandle, BROADCAST_THREAD_WAITING_TIME);
 
-                        if (threadResult == WAIT_OBJECT_0)
+                        if (threadResult == WAIT_OBJECT_0){
+                            runningBroadcast = 1;
                             broadcastGameHandle = CreateThread(0, 0, broadcastGame, NULL, 0, 0);
+                            printf("- starting the broadcasting of the server on port %d\n", PORT_AMONG_US_BROADCAST);
+                        }
                     }
                     break;
 
                 case STOP_BROADCASTING:
-                    runningBroadcast = 0;
+                    if (runningBroadcast){
+                        runningBroadcast = 0;
+                        printf("- stopping the broadcasting of the server...\n");
+                    }
                     break;
             }
         }
@@ -250,6 +261,9 @@ int main(int argc, char *argv[]) {
     signal(SIGQUIT, INThandler);
     signal(SIGINT, INThandler2);
 #endif
+
+    running = 1;
+    shouldInitialize = 1;
 
     struct clients_struct   *c  = NULL,
                             *tmpc;
@@ -366,10 +380,13 @@ int main(int argc, char *argv[]) {
 
     //set_priority;
 
-    printf("- starting the broadcasting of the server on port %d\n", PORT_AMONG_US_BROADCAST);
-    initializeBroadcasting();
-    broadcastGameHandle = CreateThread (0, 0, broadcastGame, NULL, 0, 0);
-    messageThreadHandle = CreateThread (0, 0, messageThread, NULL, 0, &messageThreadId);
+
+    if (shouldInitialize){
+        initializeBroadcasting();
+        printf("- starting the broadcasting of the server on port %d\n", PORT_AMONG_US_BROADCAST);
+        broadcastGameHandle = CreateThread (0, 0, broadcastGame, NULL, 0, 0);
+        messageThreadHandle = CreateThread (0, 0, messageThread, NULL, 0, &messageThreadId);
+    }
 
     if(!dhost[0].sin_addr.s_addr) {
         sd0 = bind_udp_socket(&peer0, Lhost, port);
