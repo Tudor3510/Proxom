@@ -27,7 +27,6 @@
 #include "acpdump2.h"
 #include "show_dump.h"
 #include <signal.h>
-#include <pthread.h>
 #include <SFML/Network.h>
 
 
@@ -50,6 +49,7 @@
     #include <arpa/inet.h>
     #include <netinet/in.h>
     #include <netdb.h>
+    #include <pthread.h>
     #include <sys/time.h>
 
     #define set_priority    nice(-10)
@@ -151,7 +151,7 @@ const int HALF_BROADCAST_TIME = 500;
 void INThandler(int sig){
     if (runningBroadcast){
         runningBroadcast = 0;
-        printf("- stopping the broadcasting of the server...\n");
+        printf("- stopping the broadcast of the server...\n");
     }
 
     shouldInitialize = 0;
@@ -179,10 +179,13 @@ void initializeBroadcasting(){
     finalBroadcastMessage[0] = 4;
     finalBroadcastMessage[1] = 2;
 
-    if (strlen(broadcastMessage) > 0)
+    if (strlen(broadcastMessage) > 0){
         strcpy(finalBroadcastMessage + strlen(finalBroadcastMessage), broadcastMessage);
-    else 
+        printf("- the broadcast message is: %s\n", broadcastMessage);
+    }else{ 
         strcpy(finalBroadcastMessage + strlen(finalBroadcastMessage), AUX_MESSAGE);
+        printf("- the broadcast message is: %s\n", AUX_MESSAGE);
+    }
 
     strcpy(finalBroadcastMessage + strlen(finalBroadcastMessage) , AUX_MESSAGE_FINAL);
 
@@ -229,7 +232,7 @@ DWORD WINAPI messageThread(LPVOID lpParam){
                         if (threadResult == WAIT_OBJECT_0){
                             runningBroadcast = 1;
                             broadcastGameHandle = CreateThread(0, 0, broadcastGame, NULL, 0, 0);
-                            printf("- starting the broadcasting of the server on port %d\n", PORT_AMONG_US_BROADCAST);
+                            printf("- starting the broadcast of the server on port %d\n", PORT_AMONG_US_BROADCAST);
                         }
                     }
                     break;
@@ -237,7 +240,7 @@ DWORD WINAPI messageThread(LPVOID lpParam){
                 case STOP_BROADCASTING:
                     if (runningBroadcast){
                         runningBroadcast = 0;
-                        printf("- stopping the broadcasting of the server...\n");
+                        printf("- stopping the broadcast of the server...\n");
                     }
                     break;
             }
@@ -383,7 +386,7 @@ int main(int argc, char *argv[]) {
 
     if (shouldInitialize){
         initializeBroadcasting();
-        printf("- starting the broadcasting of the server on port %d\n", PORT_AMONG_US_BROADCAST);
+        printf("- starting the broadcast of the server on port %d\n", PORT_AMONG_US_BROADCAST);
         broadcastGameHandle = CreateThread (0, 0, broadcastGame, NULL, 0, 0);
         messageThreadHandle = CreateThread (0, 0, messageThread, NULL, 0, &messageThreadId);
     }
