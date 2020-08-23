@@ -142,7 +142,8 @@ const char AUX_MESSAGE[] = "Server";
 const char AUX_MESSAGE_FINAL[] = "~Open~1~";
 
 char combinationKey[10] = "ALT";
-char hotKey;
+char startHotKey = 'B';
+char stopHotKey = 'J';
 
 DWORD messageThreadId = 0;
 HANDLE broadcastGameHandle, messageThreadHandle;
@@ -215,25 +216,40 @@ DWORD WINAPI messageThread(LPVOID lpParam){
     };
 
     UINT finalCombinationKey = 0;
+    UINT finalStartHotKey = 0;
+    UINT finalStopHotKey = 0;
 
     if (strcmpi(combinationKey, "alt") == 0){
         finalCombinationKey = MOD_ALT;
-        combinationKey = "Alt";
+        strcpy(combinationKey, "Alt");
     }
 
     if (strcmpi(combinationKey, "shift") == 0){
         finalCombinationKey = MOD_SHIFT;
-        combinationKey = "Shift";
+        strcpy(combinationKey, "Shift");
     }
 
     if (strcmpi(combinationKey, "ctrl") == 0){
         finalCombinationKey = MOD_CONTROL;
-        combinationKey = "Ctrl";
+        strcpy(combinationKey, "Ctrl");
     }
 
+    if (startHotKey <= 'z' && startHotKey >= 'a'){
+        finalStartHotKey = VkKeyScanExA(startHotKey, GetKeyboardLayout(0));
+        startHotKey += ('a' - 'A');
+    }else if (startHotKey <= 'Z' && startHotKey >= 'A'){
+        finalStartHotKey = VkKeyScanExA(startHotKey + ('a' - 'A'), GetKeyboardLayout(0));
+    }
 
-    RegisterHotKey(0, START_BROADCASTING, finalCombinationKey, 0x48);
-    RegisterHotKey(0, STOP_BROADCASTING, finalCombinationKey, 0x4A);
+    if (stopHotKey <= 'z' && stopHotKey >= 'a'){
+        finalStopHotKey = VkKeyScanExA(stopHotKey, GetKeyboardLayout(0));
+        stopHotKey += ('a' - 'A');
+    }else if (stopHotKey <= 'Z' && stopHotKey >= 'A'){
+        finalStopHotKey = VkKeyScanExA(stopHotKey + ('a' - 'A'), GetKeyboardLayout(0));
+    }
+
+    RegisterHotKey(0, START_BROADCASTING, finalCombinationKey, finalStartHotKey);
+    RegisterHotKey(0, STOP_BROADCASTING, finalCombinationKey, finalStopHotKey);
 
     
 
