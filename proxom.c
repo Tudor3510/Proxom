@@ -141,6 +141,9 @@ char finalBroadcastMessage[100];
 const char AUX_MESSAGE[] = "Server";
 const char AUX_MESSAGE_FINAL[] = "~Open~1~";
 
+char combinationKey[10] = "ALT";
+char hotKey;
+
 DWORD messageThreadId = 0;
 HANDLE broadcastGameHandle, messageThreadHandle;
 
@@ -211,8 +214,26 @@ DWORD WINAPI messageThread(LPVOID lpParam){
         STOP_BROADCASTING = 197
     };
 
-    RegisterHotKey(0, START_BROADCASTING, MOD_SHIFT, 0x48);
-    RegisterHotKey(0, STOP_BROADCASTING, MOD_SHIFT, 0x4A);
+    UINT finalCombinationKey = 0;
+
+    if (strcmpi(combinationKey, "alt") == 0){
+        finalCombinationKey = MOD_ALT;
+        combinationKey = "Alt";
+    }
+
+    if (strcmpi(combinationKey, "shift") == 0){
+        finalCombinationKey = MOD_SHIFT;
+        combinationKey = "Shift";
+    }
+
+    if (strcmpi(combinationKey, "ctrl") == 0){
+        finalCombinationKey = MOD_CONTROL;
+        combinationKey = "Ctrl";
+    }
+
+
+    RegisterHotKey(0, START_BROADCASTING, finalCombinationKey, 0x48);
+    RegisterHotKey(0, STOP_BROADCASTING, finalCombinationKey, 0x4A);
 
     
 
