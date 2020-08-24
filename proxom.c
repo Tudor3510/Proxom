@@ -132,6 +132,8 @@ int running = 1;
 volatile int runningBroadcast = 0;
 volatile int stoppingProxyShown = 0;
 volatile int shouldInitialize = 1;
+volatile int messageThreadInitialized = 0;
+volatile int shouldRunMessageThread = 1;
 
 int firstTimeBroadcast = 1;
 sfUdpSocket *broadcastSocket;
@@ -151,6 +153,7 @@ HANDLE broadcastGameHandle, messageThreadHandle;
 const int BROADCAST_THREAD_WAITING_TIME = 2000;
 const int PROXY_WAITING_TIME = 400;
 const int HALF_BROADCAST_TIME = 500;
+const int TIME_TO_CHECK = 15;
 
 void INThandler(int sig){
     if (runningBroadcast){
@@ -236,17 +239,22 @@ DWORD WINAPI messageThread(LPVOID lpParam){
 
     if (startHotKey <= 'z' && startHotKey >= 'a'){
         finalStartHotKey = VkKeyScanExA(startHotKey, GetKeyboardLayout(0));
-        startHotKey += ('a' - 'A');
+        startHotKey -= ('a' - 'A');
     }else if (startHotKey <= 'Z' && startHotKey >= 'A'){
         finalStartHotKey = VkKeyScanExA(startHotKey + ('a' - 'A'), GetKeyboardLayout(0));
     }
 
     if (stopHotKey <= 'z' && stopHotKey >= 'a'){
         finalStopHotKey = VkKeyScanExA(stopHotKey, GetKeyboardLayout(0));
-        stopHotKey += ('a' - 'A');
+        stopHotKey -= ('a' - 'A');
     }else if (stopHotKey <= 'Z' && stopHotKey >= 'A'){
         finalStopHotKey = VkKeyScanExA(stopHotKey + ('a' - 'A'), GetKeyboardLayout(0));
     }
+
+    printf("- the broadcast of the game can be stopped using %s + %c\n", combinationKey, stopHotKey);
+    printf("- the broadcast of the game can be started using %s + %c\n", combinationKey, startHotKey);
+
+    messageThreadInitialized = 1;
 
     RegisterHotKey(0, START_BROADCASTING, finalCombinationKey, finalStartHotKey);
     RegisterHotKey(0, STOP_BROADCASTING, finalCombinationKey, finalStopHotKey);
@@ -304,6 +312,8 @@ int main(int argc, char *argv[]) {
 
     running = 1;
     shouldInitialize = 1;
+    messageThreadInitialized = 0;
+    shouldRunMessageThread = 1;
 
     struct clients_struct   *c  = NULL,
                             *tmpc;
@@ -360,6 +370,23 @@ int main(int argc, char *argv[]) {
 
             if (strcmp(argv[index_arg], "-m") == 0){
                 strcpy(broadcastMessage, argv[index_arg + 1]);
+            }
+
+            if (strcmp(argv[index_arg], "-b") == 0){
+                if (strcmp(argv[index_arg + 1], "false") == 0)
+                    shouldRunMessageThread = 0;
+            }
+
+            if (strcmp(argv[index_arg], "-c") == 0){
+                strcpy(combinationKey, argv[index_arg + 1]);
+            }
+
+            if (strcmp(argv[index_arg], "-r") == 0){
+                startHotKey = argv[index_arg + 1][0];
+            }
+
+            if (strcmp(argv[index_arg], "-t") == 0){
+                stopHotKey = argv[index_arg + 1][0];
             }
         }
     }
@@ -425,7 +452,9 @@ int main(int argc, char *argv[]) {
         initializeBroadcasting();
         printf("- starting the broadcast of the server on port %d\n", PORT_AMONG_US_BROADCAST);
         broadcastGameHandle = CreateThread (0, 0, broadcastGame, NULL, 0, 0);
-        messageThreadHandle = CreateThread (0, 0, messageThread, NULL, 0, &messageThreadId);
+
+        if (shouldRunMessageThread)
+            messageThreadHandle = CreateThread (0, 0, messageThread, NULL, 0, &messageThreadId);
     }
 
     if(!dhost[0].sin_addr.s_addr) {
@@ -437,6 +466,7 @@ int main(int argc, char *argv[]) {
           < 0) std_err();
     }
 
+    while (!messageThreadInitialized) Sleep(TIME_TO_CHECK);
     printf("- ready\n");
     FD_ZERO(&readset);      // wait first client's packet, this is NEEDED!
     FD_SET(sdl, &readset);
